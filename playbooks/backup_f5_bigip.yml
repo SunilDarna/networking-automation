@@ -62,7 +62,7 @@
 
     - name: Save LTM Virtual Servers State
       ansible.builtin.copy:
-        content: "{{ ltm_virtuals.json.items | to_nice_json }}"
+        content: "{{ ltm_virtuals.json['items'] | to_nice_json }}"
         dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}_virtual_servers.json"
 
     - name: Summary of F5 Backup Execution
