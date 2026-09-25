@@ -1,0 +1,15 @@
+plugin: netbox.netbox.nb_inventory
+api_endpoint: "http://host.k3d.internal:8000"
+token: "U47pFDkAfxbKPGCZZzuK1JHZqjhsKpHoiv3AYWib"
+validate_certs: false
+config_context: false
+group_by:
+  - sites
+  - roles
+  - manufacturers
+  - device_types
+device_options:
+  nested_attributes: true
+ansible_host_dns_name: true
+compose:
+  ansible_host: "'host.k3d.internal'"

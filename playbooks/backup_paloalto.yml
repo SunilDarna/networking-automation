@@ -1,0 +1,32 @@
+---
+- name: Palo Alto Networks Firewall Configuration Export
+  hosts: firewalls
+  gather_facts: no
+  connection: local
+
+  vars:
+    backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    dest_dir: "../backups/paloalto"
+
+  tasks:
+    - name: Ensure destination backup directory exists
+      ansible.builtin.file:
+        path: "{{ dest_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Export Running Configuration XML from Palo Alto Firewall
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ pa_xml_port | default(9443) }}/api/?type=export&category=configuration"
+        method: GET
+        return_content: yes
+      register: panos_xml
+
+    - name: Save Firewall XML Configuration
+      ansible.builtin.copy:
+        content: "{{ panos_xml.content }}"
+        dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}_running_config.xml"
+
+    - name: Backup Completion Notice
+      ansible.builtin.debug:
+        msg: "Palo Alto configuration exported to {{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}_running_config.xml"

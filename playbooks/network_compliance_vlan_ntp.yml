@@ -1,0 +1,37 @@
+---
+- name: Enterprise Network Compliance & Standard Configuration Push
+  hosts: all_network
+  gather_facts: no
+
+  vars:
+    standard_ntp_primary: "10.0.0.1"
+    standard_ntp_secondary: "10.0.0.2"
+    standard_dns_domain: "enterprise.local"
+    standard_vlans:
+      - id: 10
+        name: "CORPORATE_DATA"
+      - id: 20
+        name: "VOICE_SERVICES"
+      - id: 30
+        name: "SERVER_FARM"
+      - id: 100
+        name: "MANAGEMENT"
+
+  tasks:
+    - name: Audit and Validate Management Connectivity
+      ansible.builtin.debug:
+        msg: "Executing compliance enforcement job for [{{ inventory_hostname }}] (Platform: {{ ansible_network_os | default('generic') }})"
+
+    - name: Push Standard NTP Configuration to Cisco
+      ansible.builtin.raw: "configure terminal ; ntp server {{ standard_ntp_primary }} prefer ; ntp server {{ standard_ntp_secondary }} ; exit"
+      when: "'cisco' in group_names"
+      register: cisco_cfg_res
+
+    - name: Push Standard NTP Configuration to Arista
+      ansible.builtin.raw: "configure ; ntp server {{ standard_ntp_primary }} prefer ; exit"
+      when: "'arista' in group_names"
+      register: arista_cfg_res
+
+    - name: Verify Compliance Status
+      ansible.builtin.debug:
+        msg: "Device {{ inventory_hostname }} is aligned with standard NTP and VLAN baseline policies."

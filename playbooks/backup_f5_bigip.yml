@@ -1,0 +1,70 @@
+---
+- name: F5 BIG-IP UCS System Backup & Configuration State Export
+  hosts: loadbalancers
+  gather_facts: no
+  connection: local
+
+  vars:
+    backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    ucs_filename: "{{ inventory_hostname }}_{{ backup_timestamp }}.ucs"
+    dest_dir: "../backups/f5"
+
+  tasks:
+    - name: Ensure destination backup directory exists
+      ansible.builtin.file:
+        path: "{{ dest_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Query F5 BIG-IP System Version
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ f5_rest_port | default(8443) }}/mgmt/tm/sys/version"
+        method: GET
+        headers:
+          Content-Type: "application/json"
+        return_content: yes
+      register: version_result
+
+    - name: Display BIG-IP System Information
+      ansible.builtin.debug:
+        msg: >
+          Device: {{ inventory_hostname }} |
+          Product: {{ version_result.json.entries['https://localhost/mgmt/tm/sys/version/0'].nestedStats.entries.Product.description }} |
+          Version: {{ version_result.json.entries['https://localhost/mgmt/tm/sys/version/0'].nestedStats.entries.Version.description }}
+
+    - name: Initiate F5 BIG-IP UCS System Archive Backup
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ f5_rest_port | default(8443) }}/mgmt/tm/sys/ucs"
+        method: POST
+        body_format: json
+        body:
+          command: "save"
+          name: "{{ ucs_filename }}"
+        status_code: 200
+      register: ucs_create_result
+
+    - name: Confirm UCS Creation Result
+      ansible.builtin.debug:
+        msg: "UCS Backup Created: {{ ucs_create_result.json.name }} (Status: {{ ucs_create_result.json.status }})"
+
+    - name: Download Generated UCS Archive from BIG-IP
+      ansible.builtin.get_url:
+        url: "http://{{ ansible_host }}:{{ f5_rest_port | default(8443) }}/mgmt/shared/file-transfer/ucs-downloads/{{ ucs_filename }}"
+        dest: "{{ dest_dir }}/{{ ucs_filename }}"
+        mode: '0644'
+
+    - name: Export LTM Virtual Servers Inventory
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ f5_rest_port | default(8443) }}/mgmt/tm/ltm/virtual"
+        method: GET
+        return_content: yes
+      register: ltm_virtuals
+
+    - name: Save LTM Virtual Servers State
+      ansible.builtin.copy:
+        content: "{{ ltm_virtuals.json.items | to_nice_json }}"
+        dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}_virtual_servers.json"
+
+    - name: Summary of F5 Backup Execution
+      ansible.builtin.debug:
+        msg: "Successfully completed F5 UCS Backup [{{ ucs_filename }}] and LTM Virtual Servers state export."

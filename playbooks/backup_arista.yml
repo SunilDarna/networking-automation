@@ -1,0 +1,30 @@
+---
+- name: Arista EOS Device Configuration Backup
+  hosts: arista
+  gather_facts: no
+
+  vars:
+    backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    dest_dir: "../backups/arista"
+
+  tasks:
+    - name: Ensure destination backup directory exists
+      ansible.builtin.file:
+        path: "{{ dest_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+
+    - name: Retrieve Arista EOS Running Configuration
+      ansible.builtin.raw: "show running-config"
+      register: eos_run_cfg
+
+    - name: Save Arista Running-Config
+      ansible.builtin.copy:
+        content: "{{ eos_run_cfg.stdout }}"
+        dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}.cfg"
+      delegate_to: localhost
+
+    - name: Display Status
+      ansible.builtin.debug:
+        msg: "Arista backup archived successfully for {{ inventory_hostname }}."

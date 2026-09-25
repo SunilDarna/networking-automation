@@ -1,0 +1,40 @@
+---
+- name: Cisco Network Device Configuration Backup & State Capture
+  hosts: cisco
+  gather_facts: no
+
+  vars:
+    backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    dest_dir: "../backups/cisco"
+
+  tasks:
+    - name: Ensure destination backup directory exists
+      ansible.builtin.file:
+        path: "{{ dest_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+
+    - name: Gather Running-Config and Hardware Version from Cisco
+      ansible.builtin.raw: "show running-config"
+      register: cisco_run_cfg
+
+    - name: Gather Device Version Details
+      ansible.builtin.raw: "show version"
+      register: cisco_ver
+
+    - name: Save Running Configuration to Local Archive
+      ansible.builtin.copy:
+        content: "{{ cisco_run_cfg.stdout }}"
+        dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}.cfg"
+      delegate_to: localhost
+
+    - name: Save Version Output
+      ansible.builtin.copy:
+        content: "{{ cisco_ver.stdout }}"
+        dest: "{{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}_version.txt"
+      delegate_to: localhost
+
+    - name: Output Backup Completion Status
+      ansible.builtin.debug:
+        msg: "Cisco backup successfully saved for {{ inventory_hostname }} at {{ dest_dir }}/{{ inventory_hostname }}_{{ backup_timestamp }}.cfg"
